@@ -2,7 +2,10 @@ package servez
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+
+	m "github.com/estevesnp/servez/middleware"
 )
 
 type Router struct {
@@ -19,16 +22,18 @@ type RouterCfg struct {
 }
 
 var defaultCfg = RouterCfg{
-	Addr: "localhost:8080",
+	Addr:                "localhost:8080",
+	PreMiddlewareFuncs:  []http.HandlerFunc{m.LogRequest},
+	PostMiddlewareFuncs: []http.HandlerFunc{m.LogResponse},
 }
 
 type httpVerb string
 
 const (
-	GET    = "GET"
-	POST   = "POST"
-	PUT    = "PUT"
-	DELETE = "DELETE"
+	getVerb    = "GET"
+	postVerb   = "POST"
+	putVerb    = "PUT"
+	deleteVerb = "DELETE"
 )
 
 func New(routerCfg *RouterCfg) *Router {
@@ -56,6 +61,10 @@ func New(routerCfg *RouterCfg) *Router {
 	}
 }
 
+func Default() *Router {
+	return New(nil)
+}
+
 func applyPreMiddleware(middlewareFunc, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		middlewareFunc(w, r)
@@ -73,7 +82,8 @@ func applyPostMiddleware(middlewareFunc, handler http.HandlerFunc) http.HandlerF
 func (r *Router) genericHandler(verb httpVerb, pattern string, handler http.HandlerFunc) {
 	endpoint := fmt.Sprintf("%s %s", verb, pattern)
 
-	for _, f := range r.preMiddlewareFuncs {
+	for i := len(r.preMiddlewareFuncs) - 1; i >= 0; i-- {
+		f := r.preMiddlewareFuncs[i]
 		handler = applyPreMiddleware(f, handler)
 	}
 
@@ -85,21 +95,22 @@ func (r *Router) genericHandler(verb httpVerb, pattern string, handler http.Hand
 }
 
 func (r *Router) GET(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	r.genericHandler(GET, pattern, handler)
+	r.genericHandler(getVerb, pattern, handler)
 }
 
 func (r *Router) POST(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	r.genericHandler(POST, pattern, handler)
+	r.genericHandler(postVerb, pattern, handler)
 }
 
 func (r *Router) PUT(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	r.genericHandler(PUT, pattern, handler)
+	r.genericHandler(putVerb, pattern, handler)
 }
 
 func (r *Router) DELETE(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	r.genericHandler(DELETE, pattern, handler)
+	r.genericHandler(deleteVerb, pattern, handler)
 }
 
 func (r *Router) Start() error {
+	log.Printf("Starting server on %s\n", r.addr)
 	return http.ListenAndServe(r.addr, r.handler)
 }

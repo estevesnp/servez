@@ -4,5 +4,5 @@ ServEZ is a simple wrapper around the stdlib's HTTP server implementation with h
 
 ## TODO
 
-- [ ] Create middleware funcs
+- [ ] Intercept ResponseWriter to log responses
 - [ ] Testing
